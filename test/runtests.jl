@@ -10,6 +10,11 @@ using FixedPointNumbers
         @test sz isa Tuple{Int, Int}
         @test sz[1] > 0
         @test sz[2] > 0
+
+        sz_buf = SixelPlot.terminal_plot_size(IOBuffer())
+        @test sz_buf isa Tuple{Int, Int}
+        @test sz_buf[1] > 0
+        @test sz_buf[2] > 0
     end
 
     @testset "Quantization (Median Cut)" begin

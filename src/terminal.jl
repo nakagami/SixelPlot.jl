@@ -16,8 +16,14 @@ function get_terminal_size_pixels(io::IO=stdout)
 
     # Try file descriptors: io, stdout (1), stdin (0), stderr (2)
     fds = Int[]
-    if io isa Base.TTY
-        push!(fds, Base.fd(io))
+    if io isa Base.TTY && isdefined(io, :handle) && io.handle != C_NULL
+        fd_ref = Ref{Cint}(0)
+        ret = ccall(:uv_fileno, Cint, (Ptr{Cvoid}, Ptr{Cint}), io.handle, fd_ref)
+        if ret == 0
+            push!(fds, Int(fd_ref[]))
+        end
+    elseif io isa IOStream
+        push!(fds, Int(Base.fd(io)))
     end
     for fd in (1, 0, 2)
         fd in fds || push!(fds, fd)
