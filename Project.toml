@@ -10,7 +10,7 @@ PNGFiles = "f57f5aa1-a3ce-4bc8-8ab9-96f992907883"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 
 [compat]
-julia = "1.9"
+julia = "1.10"
 ColorTypes = "0.11, 0.12"
 FixedPointNumbers = "0.8"
 PNGFiles = "0.4"
