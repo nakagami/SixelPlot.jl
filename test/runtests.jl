@@ -62,9 +62,11 @@ using FixedPointNumbers
 
     @testset "Plots.jl Backend Integration" begin
         # Activate sixel backend
+        prev_wstype = get(ENV, "GKSwstype", nothing)
         be = sixel()
         @test be isa SixelBackend
         @test :sixel in Plots.backends()
+        @test get(ENV, "GKSwstype", nothing) == "nul"
 
         p = plot(sin, -π, π, size=(120, 80), title="Test Sixel")
         @test p isa Plots.Plot
@@ -115,5 +117,6 @@ using FixedPointNumbers
         rm(tmp2)
 
         disable_sixel()
+        @test get(ENV, "GKSwstype", nothing) == prev_wstype
     end
 end

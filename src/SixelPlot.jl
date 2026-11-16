@@ -30,6 +30,8 @@ end
 SixelDisplay() = SixelDisplay(stdout)
 
 const _sixel_display = Ref{Union{SixelDisplay, Nothing}}(nothing)
+const _prev_gkswstype = Ref{Union{String, Nothing}}(nothing)
+const _gkswstype_was_set = Ref{Bool}(false)
 
 """
     enable_sixel(io::IO=stdout)
@@ -38,6 +40,15 @@ Enable Sixel display in the current Julia session by pushing `SixelDisplay`
 onto the display stack.
 """
 function enable_sixel(io::IO=stdout)
+    if !_gkswstype_was_set[]
+        _prev_gkswstype[] = get(ENV, "GKSwstype", nothing)
+        _gkswstype_was_set[] = true
+    end
+    ENV["GKSwstype"] = "nul"
+    if isdefined(Plots, :GR) && isdefined(Plots.GR, :emergencyclosegks)
+        Plots.GR.emergencyclosegks()
+    end
+
     d = _sixel_display[]
     if d !== nothing
         try
@@ -65,7 +76,28 @@ function disable_sixel()
         end
         _sixel_display[] = nothing
     end
+    if _gkswstype_was_set[]
+        if _prev_gkswstype[] === nothing
+            delete!(ENV, "GKSwstype")
+        else
+            ENV["GKSwstype"] = _prev_gkswstype[]
+        end
+        _prev_gkswstype[] = nothing
+        _gkswstype_was_set[] = false
+        if isdefined(Plots, :GR) && isdefined(Plots.GR, :emergencyclosegks)
+            Plots.GR.emergencyclosegks()
+        end
+    end
     return nothing
+end
+
+function _render_png(plt::Plots.Plot)
+    buf = IOBuffer()
+    withenv("GKSwstype" => "nul") do
+        show(buf, MIME("image/png"), plt)
+    end
+    seekstart(buf)
+    return PNGFiles.load(buf)
 end
 
 # Display hook for Plots.Plot
@@ -73,10 +105,7 @@ function Base.display(d::SixelDisplay, plt::Plots.Plot)
     if _sixel_display[] === d && !(plt.backend isa Plots.GRBackend)
         throw(MethodError(display, (d, plt)))
     end
-    buf = IOBuffer()
-    show(buf, MIME("image/png"), plt)
-    seekstart(buf)
-    img = PNGFiles.load(buf)
+    img = _render_png(plt)
     output_sixel(d.io, img)
     return nothing
 end
@@ -94,10 +123,7 @@ end
 Render a plot or image as Sixel graphics to `io` (defaults to `stdout`).
 """
 function show_sixel(io::IO, plt::Plots.Plot)
-    buf = IOBuffer()
-    show(buf, MIME("image/png"), plt)
-    seekstart(buf)
-    img = PNGFiles.load(buf)
+    img = _render_png(plt)
     output_sixel(io, img)
     return nothing
 end
@@ -149,7 +175,15 @@ Automatically adjusts plot size to terminal dimensions (if `size` is not specifi
 function sixel(; kw...)
     register_backend!()
 
-    # Ensure underlying rasterizer (GR) is initialized
+    # Ensure underlying rasterizer (GR) is initialized headlessly
+    if !_gkswstype_was_set[]
+        _prev_gkswstype[] = get(ENV, "GKSwstype", nothing)
+        _gkswstype_was_set[] = true
+    end
+    ENV["GKSwstype"] = "nul"
+    if isdefined(Plots, :GR) && isdefined(Plots.GR, :emergencyclosegks)
+        Plots.GR.emergencyclosegks()
+    end
     Plots.gr()
 
     # Determine plot dimensions
@@ -165,10 +199,7 @@ end
 
 # Save Sixel output to file
 function save_sixel(plt::Plots.Plot, fn::AbstractString)
-    buf = IOBuffer()
-    show(buf, MIME("image/png"), plt)
-    seekstart(buf)
-    img = PNGFiles.load(buf)
+    img = _render_png(plt)
     open(fn, "w") do f
         output_sixel(f, img)
     end
